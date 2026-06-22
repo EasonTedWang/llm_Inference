@@ -20,16 +20,24 @@ python -m unittest discover -s tests
 
 ## 当前覆盖范围
 
+- API request/result 类型和参数校验。
 - 配置校验。
-- Backend contract 的 `mock`、`cpu`、`cuda` 边界。
+- Runtime backend registry。
+- Backend contract 的 `mock`、`cpu`、`cuda` 边界和直接 logits 契约。
 - Tokenizer encode/decode。
 - Deterministic mock model logits。
 - 真实 prefill/decode generate loop 的 golden output。
 - Decoded stop text 停止条件。
+- Greedy sampler 和 stop controller 分支。
 - 请求生成最小闭环。
-- 结构化 audit event。
-- FIFO scheduler。
-- KV cache block allocation/free。
+- Engine 失败 audit 和 KV cleanup。
+- CLI parser 和 mock backend smoke path。
+- 结构化 audit event recorder。
+- FIFO scheduler 正常和非法 batch size。
+- KV cache block allocation/free 和非法分配。
+- CPU reference kernel 边界。
+
+当前测试仍不能声称完整覆盖真实推理系统。尚未覆盖真实 CUDA 执行、真实 CPU 模型、HTTP/OpenAI-compatible API、streaming、并发调度、benchmark、KV cache 复杂不变量和持久化 audit log。
 
 ## 后续扩展
 
