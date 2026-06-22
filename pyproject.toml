@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llm-inference"
+version = "0.1.0"
+description = "GPU-first, backend-selective LLM inference engine skeleton."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [
+  { name = "llm_Inference contributors" }
+]
+dependencies = []
+
+[project.scripts]
+llm-inference = "llm_inference.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+

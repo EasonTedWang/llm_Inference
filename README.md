@@ -10,3 +10,15 @@ All future research, architecture work, implementation, testing, auditing, and a
 ## Agent Instructions
 
 Agent-level development rules are maintained in [AGENTS.md](AGENTS.md). Future code work should follow those rules and the project outline together.
+
+## Local Development
+
+This project uses a Python `src/` layout. Use `uv` to create and initialize the local virtual environment:
+
+```powershell
+uv venv .venv --python 3.12
+.\.venv\Scripts\Activate.ps1
+uv pip install -e .
+$env:PYTHONPATH = "src"
+python -m unittest discover -s tests
+```
