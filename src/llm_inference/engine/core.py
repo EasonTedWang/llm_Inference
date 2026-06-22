@@ -5,7 +5,7 @@ from __future__ import annotations
 from llm_inference.api.types import GenerationRequest, GenerationResult, TokenChunk
 from llm_inference.audit import AuditEventType, EventRecorder
 from llm_inference.config import EngineConfig
-from llm_inference.decoding import StopController
+from llm_inference.decoding import GreedySampler, StopController
 from llm_inference.observability import configure_logging
 from llm_inference.runtime.registry import create_backend
 
@@ -21,6 +21,7 @@ class InferenceEngine:
         self.recorder = recorder or EventRecorder()
         self.backend = create_backend(self.config.backend)
         self.stop_controller = StopController()
+        self.sampler = GreedySampler()
         self._model_loaded = False
         configure_logging(self.config.observability.log_level)
 
@@ -43,6 +44,7 @@ class InferenceEngine:
             request.request_id,
             backend=self.backend.kind.value,
         )
+        prompt_token_ids = self.backend.tokenizer.encode(request.prompt)
 
         allocation = self.backend.allocate_kv(request)
         self.recorder.record(
@@ -55,7 +57,7 @@ class InferenceEngine:
         chunks: list[TokenChunk] = []
         finish_reason = "length"
         try:
-            state = self.backend.prefill(request, allocation)
+            state = self.backend.prefill(request, allocation, prompt_token_ids)
             self.recorder.record(
                 AuditEventType.PREFILL_COMPLETED,
                 request.request_id,
@@ -63,18 +65,25 @@ class InferenceEngine:
             )
             while True:
                 step = self.backend.decode_step(request, state)
-                chunk = TokenChunk(token_id=step.token_id, text=step.token_text)
+                if step.finished:
+                    finish_reason = step.finish_reason or "backend"
+                    break
+                token_id = self.sampler.select(step.logits)
+                token_text = self.backend.tokenizer.decode_token(token_id)
+                state.generated_token_ids.append(token_id)
+                chunk = TokenChunk(token_id=token_id, text=token_text)
                 chunks.append(chunk)
                 self.recorder.record(
                     AuditEventType.DECODE_STEP_COMPLETED,
                     request.request_id,
-                    token_id=step.token_id,
-                    token_text=step.token_text,
+                    token_id=token_id,
+                    token_text=token_text,
                 )
-                stop = self.stop_controller.should_stop(request, tuple(chunks))
-                if step.finished:
-                    finish_reason = step.finish_reason or "backend"
-                    break
+                stop = self.stop_controller.should_stop(
+                    request,
+                    tuple(chunks),
+                    eos_token_id=self.backend.tokenizer.eos_token_id,
+                )
                 if stop.stopped:
                     finish_reason = stop.reason or "stop"
                     break
@@ -103,4 +112,3 @@ class InferenceEngine:
             raise
         finally:
             self.backend.free_kv(allocation)
-

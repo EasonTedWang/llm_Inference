@@ -22,6 +22,10 @@ python -m unittest discover -s tests
 
 - 配置校验。
 - Backend contract 的 `mock`、`cpu`、`cuda` 边界。
+- Tokenizer encode/decode。
+- Deterministic mock model logits。
+- 真实 prefill/decode generate loop 的 golden output。
+- Decoded stop text 停止条件。
 - 请求生成最小闭环。
 - 结构化 audit event。
 - FIFO scheduler。
@@ -29,7 +33,7 @@ python -m unittest discover -s tests
 
 ## 后续扩展
 
-- M3：增加 mock model golden tests 和端到端 smoke test。
+- M3：继续增加错误语义、EOS/stop token 和端到端 smoke test。
 - M4：增加 streaming、取消、超时和 continuous batching 测试。
 - M5：增加 KV cache 不变量、GPU benchmark 和 CPU/GPU 对照测试。
 - M6：增加 audit schema、benchmark 报告和回归测试。

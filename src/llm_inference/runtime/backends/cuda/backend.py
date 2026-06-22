@@ -13,10 +13,18 @@ from llm_inference.runtime.contracts import (
     KVAllocation,
     PrefillState,
 )
+from llm_inference.tokenization import MockTokenizer, Tokenizer
 
 
 class CudaBackend:
     kind = BackendKind.CUDA
+
+    def __init__(self) -> None:
+        self._tokenizer = MockTokenizer()
+
+    @property
+    def tokenizer(self) -> Tokenizer:
+        return self._tokenizer
 
     def load_model(self, config: EngineConfig) -> None:
         raise BackendUnavailable(
@@ -27,7 +35,10 @@ class CudaBackend:
         raise BackendUnavailable("CUDA KV allocation is not implemented yet")
 
     def prefill(
-        self, request: GenerationRequest, allocation: KVAllocation
+        self,
+        request: GenerationRequest,
+        allocation: KVAllocation,
+        prompt_token_ids: tuple[int, ...],
     ) -> PrefillState:
         raise BackendUnavailable("CUDA prefill is not implemented yet")
 
@@ -38,4 +49,3 @@ class CudaBackend:
 
     def free_kv(self, allocation: KVAllocation) -> None:
         return None
-

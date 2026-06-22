@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+
+Logits = Mapping[int, float] | Sequence[float]
 
 
 @dataclass(frozen=True)
@@ -13,8 +16,9 @@ class SamplingParams:
 
 
 class GreedySampler:
-    def select(self, logits: tuple[float, ...]) -> int:
+    def select(self, logits: Logits) -> int:
         if not logits:
             raise ValueError("logits must not be empty")
+        if isinstance(logits, Mapping):
+            return max(logits, key=logits.__getitem__)
         return max(range(len(logits)), key=logits.__getitem__)
-

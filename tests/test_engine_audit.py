@@ -21,7 +21,13 @@ class EngineAuditTests(unittest.TestCase):
         self.assertIn(AuditEventType.DECODE_STEP_COMPLETED, event_types)
         self.assertIn(AuditEventType.REQUEST_FINISHED, event_types)
 
+        prefill_event = next(
+            event
+            for event in recorder.events
+            if event.event_type is AuditEventType.PREFILL_COMPLETED
+        )
+        self.assertEqual(prefill_event.payload["prompt_tokens"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()
-

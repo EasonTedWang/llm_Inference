@@ -33,6 +33,16 @@ CPU 与 GPU 共享 backend contract、请求/响应类型、采样语义和 audi
 - `audit`：结构化事件记录。
 - `distributed`：未来分布式入口占位。
 
+## M3 最小推理链路更新
+
+M3-1 到 M3-3 已将早期占位式字符串生成改为 token/logits 驱动的最小推理链路：
+
+- `tokenization` 定义 tokenizer protocol，并提供 deterministic `MockTokenizer`。
+- `mock` backend 使用 deterministic mock model 产生 logits。
+- `cpu` backend 保持独立可选路径，并使用 CPU reference model 产生 logits。
+- `engine.generate()` 负责 prompt encode、prefill、decode step、greedy sampling、token decode、stop condition 和 audit event。
+- `cuda` backend 仍保持独立边界，当前显式报 `BackendUnavailable`，不接续 CPU 路径。
+
 ## 前人经验映射
 
 - vLLM / LMDeploy / DeepSpeed-MII：`memory` 预留 paged/blocked KV cache 方向。
@@ -40,4 +50,3 @@ CPU 与 GPU 共享 backend contract、请求/响应类型、采样语义和 audi
 - TensorRT-LLM / FlashInfer：CUDA 后端和 GPU kernel 边界独立保留。
 - TGI / Ray Serve LLM：API、streaming、metrics 和 observability 后续进入 `api` 与 `observability`。
 - llama.cpp / ONNX Runtime GenAI / OpenVINO GenAI：CPU 后端作为独立执行路径，而不是 GPU 热路径的接续阶段。
-

@@ -7,11 +7,11 @@
 
 ## 总体判断
 
-当前项目已经完成从 M0 到 M2 的基础闭环：有明确大纲、Agent 规约、第一轮调研、Python 项目骨架、backend contract、`mock`/`cpu`/`cuda` 后端边界、基础测试和 `uv` 初始化方式。
+当前项目已经完成从 M0 到 M2 的基础闭环，并推进了 M3 的第一组核心任务：有明确大纲、Agent 规约、第一轮调研、Python 项目骨架、backend contract、`mock`/`cpu`/`cuda` 后端边界、基础测试、`uv` 初始化方式、tokenizer protocol、deterministic mock model 和真实 prefill/decode generate loop。
 
-项目尚未进入真实高性能推理阶段。当前最紧急的方向是把 M3 的最小推理链路做扎实：从“占位式 mock/cpu token 生成”推进到“有 tokenizer、mock model、可测试生成循环、稳定错误语义和端到端 smoke test”的真正最小引擎。
+项目尚未进入真实高性能推理阶段。当前最紧急的方向是继续补齐 M3：完善错误语义、收紧 backend contract、让 CPU reference backend 更接近真实模型执行，并补充更完整的 golden/集成测试。
 
-总体完成度估算：**约 28%**。
+总体完成度估算：**约 32%**。
 
 ## 已完成内容
 
@@ -37,33 +37,37 @@
 - 已通过 `uv pip install -e .` 安装本项目。
 - 已生成并提交 `uv.lock`。
 - 已新增 `.gitignore`，忽略 `.venv/`、缓存和构建产物。
+- 已完成 M3-1 tokenizer protocol。
+- 已完成 M3-2 deterministic mock model。
+- 已完成 M3-3 logits 驱动的 prefill/decode generate loop。
 
 ### 核心代码边界
 
 - `api`：已有 `GenerationRequest`、`GenerationResult`、`TokenChunk`。
-- `engine`：已有同步 `InferenceEngine.generate()` 最小请求生命周期。
+- `engine`：已有同步 `InferenceEngine.generate()`，负责 prompt encode、prefill、decode、greedy sampling、decode token、stop condition 和 audit。
 - `runtime`：已有 backend contract、backend registry，以及 `cuda`、`cpu`、`mock` 三类后端目录。
-- `mock` backend：已有确定性 token 生成路径。
-- `cpu` backend：已有独立可选执行路径的最小占位生成。
+- `mock` backend：已有 deterministic mock model，返回可预测 logits。
+- `cpu` backend：已有独立可选执行路径的 CPU reference model，返回可预测 logits。
 - `cuda` backend：已有明确边界，当前显式抛出 `BackendUnavailable`。
 - `scheduler`：已有 FIFO scheduler 和 prefill/decode 状态类型。
 - `memory`：已有最小 KV cache block allocation/free。
-- `decoding`：已有 stop condition 和 greedy sampler 接口。
+- `decoding`：已有 stop condition、decoded stop text 处理和 greedy sampler。
+- `tokenization`：已有 tokenizer protocol 和 deterministic mock tokenizer。
 - `audit`：已有结构化 audit event 和事件记录器，并接入 engine。
 - `observability`：已有基础 logging 配置。
 - `kernels`：已有 `cuda`/`cpu` kernel 边界。
 
 ### 测试与验证
 
-- 已有 11 个 `unittest` 测试。
-- 已覆盖配置校验、backend contract、mock/cpu/cuda 边界、engine audit、scheduler 和 KV cache。
+- 已有 15 个 `unittest` 测试。
+- 已覆盖配置校验、backend contract、mock/cpu/cuda 边界、tokenizer、mock model logits、golden output、stop text、engine audit、scheduler 和 KV cache。
 - 已验证命令：
 
 ```powershell
 uv run python -m unittest discover -s tests
 ```
 
-当前结果：`Ran 11 tests ... OK`
+当前结果：`Ran 15 tests ... OK`
 
 - 已验证 CLI smoke test：
 
@@ -80,7 +84,7 @@ uv run python -m llm_inference --backend mock --max-new-tokens 2 hello
 | M0：项目大纲与基础文档 | 100% | README、AGENTS、PROJECT_OUTLINE 已建立，提交/push 规约已固化 | 后续只需随架构变化维护 |
 | M1：调研与搜索机制 | 70% | `others/` 已完成第一轮横向调研和设计原语抽取 | 将核心调研迁移/整理到 `docs/research/`；补充源码级二次调研；建立可更新 source registry |
 | M2：项目骨架 | 85% | Python `src/` 布局、`uv`、backend contract、基础模块、测试、文档均已建立 | 增加类型检查/lint 配置；完善配置文件加载；补 CI；进一步收紧接口文档 |
-| M3：最小推理链路 | 30% | `mock`/`cpu` 后端已有最小同步生成；CLI 可跑；audit 已接入 | 实现 tokenizer 协议、mock model、真实生成循环语义、golden tests、错误响应和端到端 smoke test |
+| M3：最小推理链路 | 50% | tokenizer protocol、deterministic mock model、logits 驱动 generate loop、golden tests、CLI 和 audit 已接入 | 完善错误响应、CPU reference 真实化、端到端 smoke test、backend contract 边界用例 |
 | M4：服务与调度 | 10% | 有请求类型、engine 生命周期、FIFO scheduler 状态边界 | 实现 HTTP/API 层、streaming、continuous batching、取消、超时、并发队列和 prefill/decode 调度 |
 | M5：内存与性能优化 | 8% | 有 KV cache block accounting、benchmark 指标文档和 kernel 边界 | 实现 paged/blocked KV、block table、prefix cache、chunked prefill、CUDA backend、GPU benchmark |
 | M6：复杂审核系统 | 15% | 有 audit event、EventRecorder，并记录请求、后端选择、KV 分配、prefill/decode、完成/失败事件 | 定义 audit schema、持久化 audit log、配置/性能/变更/benchmark 审核报告 |
@@ -91,35 +95,35 @@ uv run python -m llm_inference --backend mock --max-new-tokens 2 hello
 | 模块 | 完成度 | 当前状态 | 下一步 |
 | --- | ---: | --- | --- |
 | `api` | 20% | 有本地请求/响应 dataclass | 定义错误结构、stream chunk、OpenAI-compatible 字段和 HTTP API |
-| `engine` | 35% | 有同步 generate 生命周期和 audit 接入 | 增加状态机、异常分类、streaming、并发安全和请求清理语义 |
+| `engine` | 45% | 有 logits 驱动 generate 生命周期、greedy sampling、token decode、stop condition 和 audit 接入 | 增加状态机、异常分类、streaming、并发安全和请求清理语义 |
 | `scheduler` | 20% | 有 FIFO scheduler、请求状态和 prefill/decode task 类型 | 实现 continuous batching、prefill/decode 拆分、取消、超时、优先级 |
-| `runtime` contract | 45% | 有 backend 接口、registry、`cuda`/`cpu`/`mock` 目录 | 收紧 contract tests；明确 logits/KV/state 形状；加入模型加载配置 |
-| `runtime/backends/mock` | 55% | 可确定性生成，用于测试 | 扩展为 mock model + tokenizer + golden output |
-| `runtime/backends/cpu` | 25% | 有独立 CPU 占位生成路径 | 接入真实 CPU reference model 或最小张量模型 |
+| `runtime` contract | 60% | 有 backend 接口、registry、`cuda`/`cpu`/`mock` 目录，并明确 logits/KV/state 初始形状 | 收紧 contract tests；加入模型加载配置；明确未来 tensor/logits 类型 |
+| `runtime/backends/mock` | 75% | 有 deterministic mock model、tokenizer 和 golden output | 增加更多边界输出、EOS 场景和错误注入 |
+| `runtime/backends/cpu` | 35% | 有独立 CPU reference model 的 logits 路径 | 接入真实 CPU reference model 或最小张量模型 |
 | `runtime/backends/cuda` | 5% | 只有边界和未实现异常 | 设计 CUDA 最小路径，选择 PyTorch/Triton/FlashInfer 的切入策略 |
 | `memory` | 20% | 有最小 KV block 分配/释放 | 实现 block table、free list、引用计数、prefix cache、碎片统计 |
-| `decoding` | 25% | 有 stop condition 和 greedy sampler | 接入 logits processor、temperature、top-k/top-p、repetition penalty |
+| `decoding` | 35% | 有 stop condition、decoded stop text 和 greedy sampler | 接入 logits processor、temperature、top-k/top-p、repetition penalty |
 | `kernels` | 5% | 只有 CPU reference 示例和 CUDA 占位 | 明确 attention/GEMM/sampling kernel API；后续接入 CUDA/Triton |
 | `observability` | 10% | 有基础 logging | 增加 metrics、latency 记录、queue length、KV usage、backend 统计 |
 | `audit` | 30% | 有结构化事件和内存 recorder | 定义 schema、序列化、持久化、本地 audit log 和测试报告 |
-| `tests` | 35% | 有 11 个基础单元测试 | 增加 golden、集成、并发、错误、属性和 CPU/GPU 对照测试 |
+| `tests` | 42% | 有 15 个基础单元测试，覆盖 tokenizer、mock model、golden output 和 stop text | 增加集成、并发、错误、属性和 CPU/GPU 对照测试 |
 | `benchmarks` | 10% | 有指标文档 | 增加可运行 benchmark 脚本、样例结果和对标格式 |
 | `distributed` | 0% | 只有目录占位 | M7 前暂不展开；后续再设计多 worker/multi-GPU |
 | `docs/research` | 0% | 尚未建立，当前调研在 `others/` | 将成熟调研沉淀到 `docs/research/engine_survey.md` 等文件 |
 
 ## 当前最紧急任务
 
-### P0：完成真正的 M3 最小推理链路
+### P0：补齐 M3 最小推理链路剩余项
 
-目标：把当前占位式生成升级为可验证的最小引擎。
+目标：在已完成 tokenizer、mock model 和 logits generate loop 的基础上，把最小引擎的错误语义、CPU reference 和端到端测试补齐。
 
 建议任务：
 
-1. 定义 tokenizer protocol，包括 encode/decode、特殊 token 和 stop token。
-2. 实现 deterministic mock model，输入 token 后返回可预测 logits。
-3. 将 `engine.generate()` 改为真正的 prefill + decode loop，而不是后端直接拼字符串。
-4. 增加 golden tests，固定 prompt、采样参数和输出。
-5. 明确错误语义：空 prompt、非法采样参数、后端不可用、KV 分配失败。
+1. 明确错误语义：空 prompt、非法采样参数、后端不可用、KV 分配失败。
+2. 为错误语义增加单元测试和端到端 smoke test。
+3. 将 CPU reference backend 从 deterministic logits 推进到最小张量模型或真实 CPU reference model。
+4. 增加 EOS 场景和 stop token 场景。
+5. 完善 backend contract 文档。
 
 ### P0：收紧 backend contract
 
@@ -167,10 +171,9 @@ uv run python -m llm_inference --backend mock --max-new-tokens 2 hello
 
 ## 风险与注意事项
 
-- 当前 `cpu` backend 只是占位生成，并不是实际 CPU 模型推理。
+- 当前 `cpu` backend 只是 deterministic reference logits，并不是实际 CPU 模型推理。
 - 当前 `cuda` backend 尚不可运行，仅用于固定独立 GPU 后端边界。
 - 当前 `memory` 只是 block accounting，还不是 paged KV cache。
 - 当前没有 HTTP 服务、OpenAI-compatible API、streaming、并发队列或 benchmark 脚本。
 - 当前没有类型检查、lint、CI 和正式 release 验收流程。
 - Git 仍会提示无法访问用户全局 ignore 的 warning，但不影响当前提交、测试和推送。
-

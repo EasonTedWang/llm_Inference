@@ -5,6 +5,8 @@ from __future__ import annotations
 from llm_inference.api.types import GenerationRequest
 from llm_inference.config import BackendKind, EngineConfig
 from llm_inference.runtime.contracts import DecodeStep, KVAllocation, PrefillState
+from llm_inference.runtime.backends.mock.model import DeterministicMockModel
+from llm_inference.tokenization import MockTokenizer, Tokenizer
 
 
 class MockBackend:
@@ -13,6 +15,12 @@ class MockBackend:
     def __init__(self) -> None:
         self.loaded_model: str | None = None
         self._allocations: set[str] = set()
+        self._tokenizer = MockTokenizer()
+        self._model = DeterministicMockModel(token_base=self._tokenizer.mock_token_base)
+
+    @property
+    def tokenizer(self) -> Tokenizer:
+        return self._tokenizer
 
     def load_model(self, config: EngineConfig) -> None:
         self.loaded_model = config.model.model_name
@@ -26,22 +34,24 @@ class MockBackend:
         return allocation
 
     def prefill(
-        self, request: GenerationRequest, allocation: KVAllocation
+        self,
+        request: GenerationRequest,
+        allocation: KVAllocation,
+        prompt_token_ids: tuple[int, ...],
     ) -> PrefillState:
         if allocation.allocation_id not in self._allocations:
             raise RuntimeError("unknown KV allocation")
         return PrefillState(
             request_id=request.request_id,
-            prompt_tokens=len(request.prompt.split()),
+            allocation_id=allocation.allocation_id,
+            prompt_token_ids=prompt_token_ids,
+            generated_token_ids=[],
         )
 
     def decode_step(
         self, request: GenerationRequest, state: PrefillState
     ) -> DecodeStep:
-        token_index = state.generated_tokens
-        state.generated_tokens += 1
-        return DecodeStep(token_id=token_index, token_text=f"mock_{token_index}")
+        return DecodeStep(logits=self._model.next_logits(state.generated_tokens))
 
     def free_kv(self, allocation: KVAllocation) -> None:
         self._allocations.discard(allocation.allocation_id)
-

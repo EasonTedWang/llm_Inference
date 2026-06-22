@@ -7,6 +7,8 @@ from dataclasses import dataclass
 
 from llm_inference.api.types import GenerationRequest
 from llm_inference.config import BackendKind, EngineConfig
+from llm_inference.decoding.sampling import Logits
+from llm_inference.tokenization import Tokenizer
 
 
 class BackendUnavailable(RuntimeError):
@@ -22,20 +24,33 @@ class KVAllocation:
 @dataclass
 class PrefillState:
     request_id: str
-    prompt_tokens: int
-    generated_tokens: int = 0
+    allocation_id: str
+    prompt_token_ids: tuple[int, ...]
+    generated_token_ids: list[int]
+
+    @property
+    def prompt_tokens(self) -> int:
+        return len(self.prompt_token_ids)
+
+    @property
+    def generated_tokens(self) -> int:
+        return len(self.generated_token_ids)
 
 
 @dataclass(frozen=True)
 class DecodeStep:
-    token_id: int
-    token_text: str
+    logits: Logits
     finished: bool = False
     finish_reason: str | None = None
 
 
 class Backend(ABC):
     kind: BackendKind
+
+    @property
+    @abstractmethod
+    def tokenizer(self) -> Tokenizer:
+        raise NotImplementedError
 
     @abstractmethod
     def load_model(self, config: EngineConfig) -> None:
@@ -47,7 +62,10 @@ class Backend(ABC):
 
     @abstractmethod
     def prefill(
-        self, request: GenerationRequest, allocation: KVAllocation
+        self,
+        request: GenerationRequest,
+        allocation: KVAllocation,
+        prompt_token_ids: tuple[int, ...],
     ) -> PrefillState:
         raise NotImplementedError
 
@@ -60,4 +78,3 @@ class Backend(ABC):
     @abstractmethod
     def free_kv(self, allocation: KVAllocation) -> None:
         raise NotImplementedError
-
